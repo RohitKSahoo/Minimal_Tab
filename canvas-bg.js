@@ -59,14 +59,16 @@ if (settingsJSON.bgAnimation) {
         }
 
         if (type === 'particles') {
-            const numberOfParticles = ((width * height) / 9000) * densityMult;
+            const numberOfParticles = ((width * height) / 6500) * densityMult;
+            const colors = ['14, 165, 233', '56, 189, 248', '129, 140, 248', '192, 132, 252', '244, 114, 182', '52, 211, 153', '251, 191, 36', '248, 113, 113'];
             for (let i = 0; i < numberOfParticles; i++) {
-                const size = (Math.random() * 2) + 1;
+                const size = (Math.random() * 2.5) + 1.5;
                 const x = (Math.random() * ((width - size * 2) - (size * 2)) + size * 2);
                 const y = (Math.random() * ((height - size * 2) - (size * 2)) + size * 2);
                 const directionX = (Math.random() * 2) - 1;
                 const directionY = (Math.random() * 2) - 1;
-                particles.push(new Particle(x, y, directionX, directionY, size));
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                particles.push(new Particle(x, y, directionX, directionY, size, color));
             }
         } else if (type === 'gravity') {
             const numberOfParticles = ((width * height) / 4000) * densityMult;
@@ -126,17 +128,18 @@ if (settingsJSON.bgAnimation) {
     }
 
     class Particle {
-        constructor(x, y, directionX, directionY, size) {
+        constructor(x, y, directionX, directionY, size, color) {
             this.x = x;
             this.y = y;
             this.directionX = directionX;
             this.directionY = directionY;
             this.size = size;
+            this.color = color;
         }
         draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
-            ctx.fillStyle = document.body.classList.contains('dark') ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.5)';
+            ctx.fillStyle = this.color ? `rgba(${this.color}, 0.8)` : (document.body.classList.contains('dark') ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.5)');
             ctx.fill();
         }
         update() {
@@ -171,15 +174,21 @@ if (settingsJSON.bgAnimation) {
 
     function connect() {
         for (let a = 0; a < particles.length; a++) {
-            for (let b = a; b < particles.length; b++) {
+            for (let b = a + 1; b < particles.length; b++) {
                 let distance = ((particles[a].x - particles[b].x) * (particles[a].x - particles[b].x)) +
                     ((particles[a].y - particles[b].y) * (particles[a].y - particles[b].y));
                 if (distance < 15000) {
                     let opacityValue = 1 - (distance / 15000);
-                    const isDark = document.body.classList.contains('dark');
-                    let color = isDark ? `rgba(255, 255, 255, ${opacityValue * 0.2})` : `rgba(0, 0, 0, ${opacityValue * 0.2})`;
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 1;
+                    if (particles[a].color && particles[b].color) {
+                        let gradient = ctx.createLinearGradient(particles[a].x, particles[a].y, particles[b].x, particles[b].y);
+                        gradient.addColorStop(0, `rgba(${particles[a].color}, ${opacityValue * 0.5})`);
+                        gradient.addColorStop(1, `rgba(${particles[b].color}, ${opacityValue * 0.5})`);
+                        ctx.strokeStyle = gradient;
+                    } else {
+                        const isDark = document.body.classList.contains('dark');
+                        ctx.strokeStyle = isDark ? `rgba(255, 255, 255, ${opacityValue * 0.4})` : `rgba(0, 0, 0, ${opacityValue * 0.4})`;
+                    }
+                    ctx.lineWidth = 1.2;
                     ctx.beginPath();
                     ctx.moveTo(particles[a].x, particles[a].y);
                     ctx.lineTo(particles[b].x, particles[b].y);
@@ -684,6 +693,21 @@ if (settingsJSON.bgAnimation) {
     window.addEventListener('mousedown', (e) => {
         if (e.button === 0) mouse.isLeftDown = true;
         if (e.button === 2) mouse.isRightDown = true;
+
+        if (type === 'particles' && e.button === 0) {
+            const hue = Math.floor(Math.random() * 360);
+            function hslToRgb(h, s, l) {
+                s /= 100; l /= 100;
+                const k = n => (n + h / 30) % 12;
+                const a = s * Math.min(l, 1 - l);
+                const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+                return `${Math.round(255 * f(0))}, ${Math.round(255 * f(8))}, ${Math.round(255 * f(4))}`;
+            }
+            for (let i = 0; i < particles.length; i++) {
+                const h = (hue + Math.random() * 60 - 30 + 360) % 360; // Variations within this hue theme
+                particles[i].color = hslToRgb(h, 85 + Math.random() * 15, 50 + Math.random() * 20);
+            }
+        }
     });
 
     window.addEventListener('mouseup', (e) => {
