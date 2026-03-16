@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Minimal New Tab
 
 ✨ A clean, minimal, customizable **New Tab page** for Chrome, with:
@@ -40,3 +41,6 @@
 For manual installation, clone this repository and [load it as an unpacked extension](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked).
 ```bash
 git clone https://github.com/ujain1999/minimal_newtab.git
+=======
+# Minimal_Tab
+>>>>>>> 829eb1bf87afd74cb4c7fa78aad32b3e17b9f0dd
