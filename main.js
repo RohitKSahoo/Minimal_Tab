@@ -1,11 +1,23 @@
 import { renderCalendar } from './widgets/calendar.js';
 import { renderTodo } from './widgets/todo.js';
+import { renderPomodoro } from './widgets/pomodoro.js';
+import { renderNotes } from './widgets/notes.js';
 
 function updateClock() {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
     const mins = String(now.getMinutes()).padStart(2, '0');
-    document.getElementById('clock').textContent = `${hours}:${mins}`;
+    const secs = String(now.getSeconds()).padStart(2, '0');
+
+    let timeStr = `${hours}:${mins}`;
+    if (settings.clockSeconds) {
+        timeStr += `:${secs}`;
+    }
+    document.getElementById('clock').textContent = timeStr;
+
+    if (localStorage.getItem('theme') === 'adaptive' && secs === '00') {
+        applyTheme('adaptive');
+    }
 }
 
 const weatherCodes = {
@@ -20,7 +32,7 @@ const weatherCodes = {
 function fetchWeatherAndCity(lat, lon, tempUnit = 'celsius') {
     const now = new Date();
     const cachedWeather = localStorage.getItem('weatherData');
-    
+
     if (cachedWeather) {
         const weatherData = JSON.parse(cachedWeather);
         if ((now - new Date(weatherData.timestamp)) < 30 * 60 * 1000) {
@@ -45,7 +57,7 @@ function fetchWeatherAndCity(lat, lon, tempUnit = 'celsius') {
                     const city = location.address.city || location.address.town || location.address.village || location.address.county || "your area";
                     const weatherString = `${city}: ${weatherText}`;
                     document.getElementById('weather').textContent = weatherString;
-                    
+
                     // Cache the weather data
                     localStorage.setItem('weatherData', JSON.stringify({
                         text: weatherString,
@@ -64,7 +76,7 @@ function fetchWeatherAndCity(lat, lon, tempUnit = 'celsius') {
 function fetchWeatherByCity(city, tempUnit = 'celsius') {
     const now = new Date();
     const cachedWeather = localStorage.getItem('weatherData');
-    
+
     if (cachedWeather) {
         const weatherData = JSON.parse(cachedWeather);
         if ((now - new Date(weatherData.timestamp)) < 30 * 60 * 1000) {
@@ -134,13 +146,17 @@ function analyzeAndSetTextColor(imageUrl) {
 async function setUnsplashBackground(forceRefresh = false) {
     const now = new Date();
     const cachedData = localStorage.getItem('unsplashData');
-    const userApiKey = settings.unsplashApiKey;    
-    
+    const userApiKey = settings.unsplashApiKey;
+
     let currentTheme = localStorage.getItem('theme') || 'system';
     let themeQuery = '';
     if (currentTheme === 'system') {
         currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } else if (currentTheme === 'adaptive') {
+        const hour = new Date().getHours();
+        currentTheme = (hour >= 6 && hour < 18) ? 'light' : 'dark';
     }
+
     if (currentTheme === 'dark') {
         themeQuery = ',dark';
     }
@@ -185,7 +201,7 @@ async function setUnsplashBackground(forceRefresh = false) {
         if (userApiKey) {
             const cacheBust = new Date().getTime();
             apiUrl = `https://api.unsplash.com/photos/random?query=wallpapers${themeQuery}&orientation=landscape&client_id=${userApiKey}&cache_bust=${cacheBust}`;
-        
+
         }
         const response = await fetch(apiUrl);
         if (response.ok) {
@@ -212,16 +228,19 @@ async function setUnsplashBackground(forceRefresh = false) {
 
 function applyTheme(theme) {
     document.body.classList.remove('dark', 'light');
-    if (theme === 'dark') {
+    let effectiveTheme = theme;
+
+    if (theme === 'adaptive') {
+        const hour = new Date().getHours();
+        effectiveTheme = (hour >= 6 && hour < 18) ? 'light' : 'dark';
+    } else if (theme === 'system') {
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    if (effectiveTheme === 'dark') {
         document.body.classList.add('dark');
-    } else if (theme === 'light') {
-        document.body.classList.add('light');
     } else {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.body.classList.add('dark');
-        } else {
-            document.body.classList.add('light');
-        }
+        document.body.classList.add('light');
     }
 
     const iconContainer = document.querySelector('.theme-icon');
@@ -230,18 +249,7 @@ function applyTheme(theme) {
     label.textContent = theme[0].toUpperCase() + theme.slice(1);
 
     const customizeContainer = document.querySelector('.customize-icon');
-    if (theme == 'system') {
-        if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-            customizeContainer.innerHTML = customizeIcon["dark"];
-        }
-        else {
-            customizeContainer.innerHTML = customizeIcon["light"];
-        }
-    }
-    else {
-        customizeContainer.innerHTML = customizeIcon[theme];
-    }
-
+    customizeContainer.innerHTML = customizeIcon[effectiveTheme];
 }
 
 function renderBookmarks(nodes, container, level = 0, path = "") {
@@ -301,6 +309,15 @@ function renderBookmarks(nodes, container, level = 0, path = "") {
             a.href = node.url;
             a.className = 'shortcut';
             a.textContent = node.title || node.url;
+
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (typeof chrome !== 'undefined' && chrome.tabs) {
+                    chrome.tabs.update(undefined, { url: node.url });
+                } else {
+                    window.location.href = node.url;
+                }
+            });
 
             listItem.appendChild(a);
             container.appendChild(listItem);
@@ -364,7 +381,7 @@ if (settings.weather) {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 pos => fetchWeatherAndCity(pos.coords.latitude, pos.coords.longitude, tempUnit),
-                () => { 
+                () => {
                     setTimeout(() => {
                         navigator.geolocation.getCurrentPosition(
                             pos => fetchWeatherAndCity(pos.coords.latitude, pos.coords.longitude, tempUnit),
@@ -381,29 +398,61 @@ if (settings.weather) {
     document.getElementById('weather').style.display = 'none';
 }
 
+const quotes = [
+    "The only way to do great work is to love what you do. - Steve Jobs",
+    "Believe you can and you're halfway there. - Theodore Roosevelt",
+    "It does not matter how slowly you go as long as you do not stop. - Confucius",
+    "Everything you've ever wanted is on the other side of fear. - George Addair",
+    "Success is not final, failure is not fatal: it is the courage to continue that counts. - Winston Churchill",
+    "Hardships often prepare ordinary people for an extraordinary destiny. - C.S. Lewis",
+    "Believe in yourself. You are braver than you think, more talented than you know, and capable of more than you imagine. - Roy T. Bennett",
+    "Don't watch the clock; do what it does. Keep going. - Sam Levenson",
+    "Act as if what you do makes a difference. It does. - William James",
+    "Success usually comes to those who are too busy to be looking for it. - Henry David Thoreau",
+    "Opportunities don't happen, you create them. - Chris Grosser",
+    "Don't let yesterday take up too much of today. - Will Rogers",
+    "You learn more from failure than from success. Don't let it stop you. Failure builds character. - Unknown",
+    "If you are working on something that you really care about, you don't have to be pushed. The vision pulls you. - Steve Jobs"
+];
+
+if (settings.quote !== false) {
+    const quoteEl = document.getElementById('quote');
+    if (quoteEl) {
+        const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+        const parts = randomQuote.split(' - ');
+        quoteEl.innerHTML = `"${parts[0]}"<br><span style="font-size: 0.85em; opacity: 0.7; display: inline-block; margin-top: 5px;">— ${parts[1]}</span>`;
+    }
+} else {
+    document.getElementById('quote').style.display = 'none';
+}
+
 if (settings.bookmarks) {
-    chrome.bookmarks.getTree(tree => {
-        const shortcuts = document.getElementById('shortcuts');
-        let bookmarksBar = settings.bookmarkFolder?.trim()
-            ? tree[0].children.find(f => f.title.toLowerCase() === settings.bookmarkFolder.toLowerCase())
-            : tree[0].children[0];
+    if (typeof chrome !== 'undefined' && chrome.bookmarks) {
+        chrome.bookmarks.getTree(tree => {
+            const shortcuts = document.getElementById('shortcuts');
+            let bookmarksBar = settings.bookmarkFolder?.trim()
+                ? tree[0].children.find(f => f.title.toLowerCase() === settings.bookmarkFolder.toLowerCase())
+                : tree[0].children[0];
 
-        if (settings.bookmarkFolder?.trim() && !bookmarksBar) {
-            shortcuts.textContent = "Bookmark folder not found.";
-            return;
-        }
+            if (settings.bookmarkFolder?.trim() && !bookmarksBar) {
+                shortcuts.textContent = "Bookmark folder not found.";
+                return;
+            }
 
-        const listRoot = document.createElement('ul');
-        listRoot.className = 'bookmark-list';
-        shortcuts.innerHTML = '';
+            const listRoot = document.createElement('ul');
+            listRoot.className = 'bookmark-list';
+            shortcuts.innerHTML = '';
 
-        renderBookmarks(
-            settings.bookmarkFolder?.trim() ? bookmarksBar.children : tree[0].children,
-            listRoot
-        );
+            renderBookmarks(
+                settings.bookmarkFolder?.trim() ? bookmarksBar.children : tree[0].children,
+                listRoot
+            );
 
-        shortcuts.appendChild(listRoot);
-    });
+            shortcuts.appendChild(listRoot);
+        });
+    } else {
+        document.getElementById('shortcuts').textContent = "Bookmarks not available outside of extension.";
+    }
 } else {
     document.getElementById("shortcuts").style.display = 'none';
 }
@@ -418,8 +467,12 @@ if (settings.topRight) {
             itemElem.id = "open-" + item["id"];
             itemElem.innerHTML = item["id"];
             itemElem.addEventListener('click', () => {
-                chrome.tabs.create({ url: item['url'] });
-            })
+                if (typeof chrome !== 'undefined' && chrome.tabs) {
+                    chrome.tabs.update(undefined, { url: item['url'] });
+                } else {
+                    window.location.href = item['url'];
+                }
+            });
             container.append(itemElem);
         }
 
@@ -439,7 +492,9 @@ if (settings.sidebar) {
 
     const widgetRenderers = {
         calendar: renderCalendar,
-        todo: renderTodo
+        todo: renderTodo,
+        pomodoro: renderPomodoro,
+        notes: renderNotes
     };
 
     if (selectedWidgets.length > 0) {
@@ -461,7 +516,7 @@ if (settings.sidebar) {
     if (settings.sidebarExpanded) {
         sidebar.classList.remove('minimised');
     }
-    
+
     if (settings.sidebarShowCustomize || settings.sidebarExpanded) {
         const sidebarFooter = document.createElement('div');
         sidebarFooter.className = 'sidebar-footer';
@@ -480,7 +535,7 @@ if (settings.sidebar) {
         const isLeft = settings.sidebarPosition === 'left';
         const isRight = settings.sidebarPosition === 'right' || !settings.sidebarPosition;
         const isExpanded = !sidebar.classList.contains('minimised');
-        
+
         // Hide customize button when sidebar is on left and expanded
         if (isLeft && isExpanded) {
             customizeBtn.style.opacity = '0';
@@ -489,7 +544,7 @@ if (settings.sidebar) {
             customizeBtn.style.opacity = '1';
             customizeBtn.style.pointerEvents = 'auto';
         }
-        
+
         // Hide theme toggle when sidebar is on right and expanded
         if (isRight && isExpanded) {
             themeToggle.style.opacity = '0';
@@ -499,9 +554,9 @@ if (settings.sidebar) {
             themeToggle.style.pointerEvents = 'auto';
         }
     };
-    
+
     updateCustomizeVisibility();
-    
+
     const handle = sidebar.querySelector('.sidebar-handle');
     handle.addEventListener('click', () => {
         sidebar.classList.toggle('minimised');
@@ -516,7 +571,8 @@ if (settings.unsplashApiKey && settings.showUnsplashRefresh) {
 const icons = {
     system: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"> <defs> <linearGradient id="half"> <stop offset="50%" stop-color="white" /> <stop offset="50%" stop-color="black" /> </linearGradient> </defs> <circle cx="24" cy="24" r="10" fill="url(#half)" stroke="currentColor" stroke-width="2"/> <line x1="24" y1="2" x2="24" y2="10" stroke="currentColor" stroke-width="2"/> <line x1="24" y1="38" x2="24" y2="46" stroke="currentColor" stroke-width="2"/> <line x1="2" y1="24" x2="10" y2="24" stroke="currentColor" stroke-width="2"/> <line x1="38" y1="24" x2="46" y2="24" stroke="currentColor" stroke-width="2"/> <line x1="8.5" y1="8.5" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="2"/> <line x1="33.5" y1="33.5" x2="39.5" y2="39.5" stroke="currentColor" stroke-width="2"/> <line x1="8.5" y1="39.5" x2="14.5" y2="33.5" stroke="currentColor" stroke-width="2"/> <line x1="33.5" y1="14.5" x2="39.5" y2="8.5" stroke="currentColor" stroke-width="2"/> </svg>`,
     dark: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path fill="none" stroke="white" d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 1 0 9.79 9.79Z"/> </svg>`,
-    light: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="black" stroke-width="2"> <circle cx="24" cy="24" r="10" fill="none"/> <line x1="24" y1="2" x2="24" y2="10"/> <line x1="24" y1="38" x2="24" y2="46"/> <line x1="2" y1="24" x2="10" y2="24"/> <line x1="38" y1="24" x2="46" y2="24"/> <line x1="8.5" y1="8.5" x2="14.5" y2="14.5"/> <line x1="33.5" y1="33.5" x2="39.5" y2="39.5"/> <line x1="8.5" y1="39.5" x2="14.5" y2="33.5"/> <line x1="33.5" y1="14.5" x2="39.5" y2="8.5"/> </svg>`
+    light: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="black" stroke-width="2"> <circle cx="24" cy="24" r="10" fill="none"/> <line x1="24" y1="2" x2="24" y2="10"/> <line x1="24" y1="38" x2="24" y2="46"/> <line x1="2" y1="24" x2="10" y2="24"/> <line x1="38" y1="24" x2="46" y2="24"/> <line x1="8.5" y1="8.5" x2="14.5" y2="14.5"/> <line x1="33.5" y1="33.5" x2="39.5" y2="39.5"/> <line x1="8.5" y1="39.5" x2="14.5" y2="33.5"/> <line x1="33.5" y1="14.5" x2="39.5" y2="8.5"/> </svg>`,
+    adaptive: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"> <circle cx="24" cy="24" r="10" fill="none"/> <polyline points="24 16 24 24 28 28"/> </svg>`
 };
 
 const customizeIcon = {
@@ -535,6 +591,8 @@ applyTheme(theme);
 // Handle toggle click
 document.querySelector('.theme-toggle').addEventListener('click', () => {
     if (theme === 'system') {
+        theme = 'adaptive';
+    } else if (theme === 'adaptive') {
         theme = 'dark';
     } else if (theme === 'dark') {
         theme = 'light';

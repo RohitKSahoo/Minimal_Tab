@@ -1,6 +1,6 @@
 function debounce(func, delay) {
     let timeout;
-    return function(...args) {
+    return function (...args) {
         const context = this;
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(context, args), delay);
@@ -29,7 +29,7 @@ function showNotification(message, duration = 2000, type = 'success', reload = f
     notification.classList.add(type);
     notification.classList.remove('hidden');
     notification.classList.add('show');
-    
+
     setTimeout(() => {
         notification.classList.remove('show');
         setTimeout(() => {
@@ -42,10 +42,17 @@ function showNotification(message, duration = 2000, type = 'success', reload = f
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Add loaded class for animation
+    setTimeout(() => {
+        document.getElementById('options-wrapper').classList.add('loaded');
+    }, 10);
+
     const settings_keys = [
-        "clock", "weather", "useCustomCity", "customCity", "tempUnit", "bookmarks", "bookmarkFolder", "expandBookmarks", "topRight", "topRightOrder", "pixelArt", 
+        "clock", "clockSeconds", "weather", "quote", "pet", "petType", "petSize", "petFreq", "useCustomCity", "customCity", "tempUnit", "bookmarks", "bookmarkFolder", "expandBookmarks", "topRight", "topRightOrder", "pixelArt",
         "selectedPixelArt", "customSVG", "pixelArtOpacity", "pixelArtDensity", "pixelArtColorDark", "pixelArtColorLight", "availableWidgets", "theme", "backgroundImage",
-        "sidebar", "sidebarPosition", "sidebarWidgets", "sidebarExpanded", "sidebarShowCustomize", "autoHide", "useUnsplash", "unsplashApiKey", "unsplashUpdateFrequency", 
+        "bgAnimation", "bgAnimationType", "bgAnimationSpeed", "bgAnimationDensity",
+        "sidebar", "sidebarPosition", "sidebarWidgets", "sidebarExpanded", "sidebarShowCustomize", "autoHide", "useUnsplash", "unsplashApiKey", "unsplashUpdateFrequency",
         "showUnsplashRefresh", "customCSS"
     ];
 
@@ -59,6 +66,33 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settings['clock']) {
         document.getElementById("show-clock").checked = true;
     };
+    if (settings['clockSeconds']) {
+        document.getElementById("clock-seconds").checked = true;
+    }
+    if (settings['quote']) {
+        document.getElementById("show-quote").checked = true;
+    }
+    if (settings['pet']) {
+        document.getElementById("show-pet").checked = true;
+        document.getElementById("pet-options").style.display = "block";
+    } else {
+        document.getElementById("pet-options").style.display = "none";
+    }
+    if (settings['petType']) {
+        document.getElementById('pet-type').value = settings['petType'];
+    }
+    if (settings['petSize']) {
+        document.getElementById('pet-size').value = settings['petSize'];
+        document.getElementById("pet-size-display").textContent = settings['petSize'] + "px";
+    }
+    if (settings['petFreq']) {
+        const val = parseInt(settings['petFreq']);
+        document.getElementById('pet-freq').value = val;
+        let text = "Normal";
+        if (val < 40) text = "Lazy";
+        else if (val > 60) text = "Energetic";
+        document.getElementById("pet-freq-display").textContent = text;
+    }
     if (settings['weather']) {
         document.getElementById("show-weather").checked = true;
     } else {
@@ -117,6 +151,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (settings['pixelArtColorLight']) {
         document.getElementById("pixelArtColorLight").value = settings['pixelArtColorLight'];
+    }
+    if (settings['bgAnimation']) {
+        document.getElementById("show-bgAnimation").checked = true;
+    } else {
+        document.getElementById("bg-animation-options").classList.add("disabled");
+    }
+    if (settings['bgAnimationType']) {
+        document.getElementById("bgAnimationType").value = settings['bgAnimationType'];
+    }
+    if (settings['bgAnimationSpeed']) {
+        document.getElementById("bgAnimationSpeed").value = settings['bgAnimationSpeed'];
+    }
+    if (settings['bgAnimationDensity']) {
+        document.getElementById("bgAnimationDensity").value = settings['bgAnimationDensity'];
     }
     if (settings['customCSS']) {
         document.getElementById("custom-css").value = settings['customCSS'];
@@ -196,6 +244,21 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleUnsplashAdvancedOptions(); // Initial check
     document.getElementById('unsplash-update-frequency').value = settings.unsplashUpdateFrequency || 'daily';
     showUnsplashRefreshCheckbox.checked = settings.showUnsplashRefresh || false;
+
+    // Pet event listeners for UI display updates
+    document.getElementById("show-pet").addEventListener('change', (e) => {
+        document.getElementById("pet-options").style.display = e.target.checked ? "block" : "none";
+    });
+    document.getElementById("pet-size").addEventListener('input', (e) => {
+        document.getElementById("pet-size-display").textContent = e.target.value + "px";
+    });
+    document.getElementById("pet-freq").addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        let text = "Normal";
+        if (val < 40) text = "Lazy";
+        else if (val > 60) text = "Energetic";
+        document.getElementById("pet-freq-display").textContent = text;
+    });
 
     // Populate About panel: logo and version + links
     try {
@@ -285,12 +348,14 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = "";
         settings['topRightOrder'].map(item => {
             let tr = document.createElement("tr");
+            tr.setAttribute("draggable", "true");
             let td1 = document.createElement("td");
             let td1label = document.createElement("label");
             td1label.className = "checkbox-label";
             let td1check = document.createElement("input")
             td1check.type = "checkbox";
             td1check.setAttribute("data-key", item.id);
+            td1check.setAttribute("data-url", item.url);
             td1check.checked = item.displayBool;
             td1label.innerHTML = '<span class="custom-checkbox"></span>';
             td1label.prepend(td1check);
@@ -300,13 +365,88 @@ document.addEventListener('DOMContentLoaded', () => {
             let td3 = document.createElement("td");
             td3.innerHTML = `<span>☰</span>`;
             td3.classList.add('drag-handle');
+            let td4 = document.createElement("td");
+            let delBtn = document.createElement("button");
+            delBtn.className = "ghost-button";
+            delBtn.style.padding = "2px 6px";
+            delBtn.style.fontSize = "12px";
+            delBtn.textContent = "✖";
+            delBtn.onclick = function () {
+                tr.remove();
+                autoSaveSettings();
+            };
+            td4.append(delBtn);
+
             tr.innerHTML = "";
             tr.append(td1);
             tr.append(td2);
             tr.append(td3);
+            tr.append(td4);
             tbody.append(tr);
         })
     }
+
+    document.getElementById('add-custom-shortcut').addEventListener('click', () => {
+        const nameInput = document.getElementById('custom-shortcut-name');
+        const urlInput = document.getElementById('custom-shortcut-url');
+        const name = nameInput.value.trim();
+        let url = urlInput.value.trim();
+
+        if (!name || !url) {
+            alert('Please enter both a name and a URL.');
+            return;
+        }
+
+        if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('chrome://')) {
+            url = 'https://' + url;
+        }
+
+        const tbody = document.querySelector("table#top-right-links tbody");
+        let tr = document.createElement("tr");
+        tr.draggable = true;
+
+        let td1 = document.createElement("td");
+        let td1label = document.createElement("label");
+        td1label.className = "checkbox-label";
+        let td1check = document.createElement("input")
+        td1check.type = "checkbox";
+        td1check.setAttribute("data-key", name.toLowerCase().replace(/\s+/g, '-'));
+        td1check.setAttribute("data-url", url);
+        td1check.checked = true;
+        td1check.addEventListener('change', autoSaveSettings);
+        td1label.innerHTML = '<span class="custom-checkbox"></span>';
+        td1label.prepend(td1check);
+        td1.append(td1label);
+
+        let td2 = document.createElement("td");
+        td2.innerHTML = name;
+
+        let td3 = document.createElement("td");
+        td3.innerHTML = `<span>☰</span>`;
+        td3.classList.add('drag-handle');
+
+        let td4 = document.createElement("td");
+        let delBtn = document.createElement("button");
+        delBtn.className = "ghost-button";
+        delBtn.style.padding = "2px 6px";
+        delBtn.style.fontSize = "12px";
+        delBtn.textContent = "✖";
+        delBtn.onclick = function () {
+            tr.remove();
+            autoSaveSettings();
+        };
+        td4.append(delBtn);
+
+        tr.append(td1);
+        tr.append(td2);
+        tr.append(td3);
+        tr.append(td4);
+        tbody.prepend(tr);
+
+        nameInput.value = '';
+        urlInput.value = '';
+        autoSaveSettings();
+    });
     const shortcutsTableBody = document.querySelector("table#top-right-links tbody");
     let draggingShortcutRow = null;
 
@@ -325,6 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
             draggingShortcutRow.classList.remove('dragging');
             draggingShortcutRow = null;
         }
+        autoSaveSettings();
     });
 
     shortcutsTableBody.addEventListener('dragover', e => {
@@ -352,30 +493,43 @@ document.addEventListener('DOMContentLoaded', () => {
     allOption.selected = !settings['bookmarkFolder'];
     selectElem.append(allOption);
 
-    chrome.bookmarks.getTree(tree => {
-        tree[0].children.forEach(folder => {
-            const optionElem = document.createElement("option");
-            optionElem.value = optionElem.text = folder.title;
-            optionElem.selected = settings['bookmarkFolder'] === folder.title;
-            selectElem.append(optionElem);
+    if (typeof chrome !== 'undefined' && chrome.bookmarks) {
+        chrome.bookmarks.getTree(tree => {
+            tree[0].children.forEach(folder => {
+                const optionElem = document.createElement("option");
+                optionElem.value = optionElem.text = folder.title;
+                optionElem.selected = settings['bookmarkFolder'] === folder.title;
+                selectElem.append(optionElem);
+            });
         });
-    });
+    } else {
+        const optionElem = document.createElement("option");
+        optionElem.value = optionElem.text = "Bookmarks not available";
+        selectElem.append(optionElem);
+    }
 
     // Back link navigation
     document.getElementById("back-link").addEventListener("click", () => {
-        chrome.tabs.update({ url: "chrome://newtab" });
+        if (typeof chrome !== 'undefined' && chrome.tabs) {
+            chrome.tabs.update({ url: "chrome://newtab" });
+        } else {
+            window.location.href = "index.html";
+        }
     });
 
     // Navigate back when pressing Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
-            chrome.tabs.update({ url: "chrome://newtab" });
+            if (typeof chrome !== 'undefined' && chrome.tabs) {
+                chrome.tabs.update({ url: "chrome://newtab" });
+            } else {
+                window.location.href = "index.html";
+            }
         }
     });
 
-    let saveBtn = document.getElementById("save");
-    saveBtn.addEventListener("click", () => {
+    function autoSaveSettings() {
         let settings_obj = {};
         settings_keys.map((key) => {
             if (key == "topRightOrder") {
@@ -386,10 +540,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     let tr = tbody.children[i];
                     let trType = tr.querySelector("td input").getAttribute("data-key");
                     let checkedBool = tr.querySelector("td input").checked;
+                    let urlData = tr.querySelector("td input").getAttribute("data-url");
                     orderArr.push({
                         id: trType,
                         displayBool: checkedBool,
-                        url: trType == "passwords" ? "chrome://password-manager/passwords" : "chrome://" + trType
+                        url: urlData
                     });
                 }
                 settings_obj["topRightOrder"] = orderArr;
@@ -406,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (key == "customSVG") {
                 settings_obj[key] = document.querySelector("#custom-svg-input").value;
             }
-            else if (["pixelArtOpacity", "pixelArtDensity", "pixelArtColorDark", "pixelArtColorLight"].includes(key)) {
+            else if (["pixelArtOpacity", "pixelArtDensity", "pixelArtColorDark", "pixelArtColorLight", "bgAnimationSpeed", "bgAnimationDensity", "bgAnimationType"].includes(key)) {
                 settings_obj[key] = document.getElementById(key).value;
             }
             else if (key == "customCity") {
@@ -436,7 +591,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const widgetRows = document.querySelectorAll('#sidebar-widgets tr');
                 const selectedWidgets = [];
                 widgetRows.forEach(row => {
-                    selectedWidgets.push(row.querySelector('input').getAttribute('data-widget'));
+                    const input = row.querySelector('input');
+                    if (input.checked) {
+                        selectedWidgets.push(input.getAttribute('data-widget'));
+                    }
                 });
                 settings_obj[key] = selectedWidgets;
             } else if (key === 'availableWidgets') {
@@ -464,6 +622,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rawCSS = document.getElementById('custom-css').value;
                 settings_obj[key] = rawCSS.replace(/<\/style>/gi, '');
             }
+            else if (key === 'petType') {
+                settings_obj[key] = document.getElementById('pet-type').value;
+            }
+            else if (key === 'petSize') {
+                settings_obj[key] = parseInt(document.getElementById('pet-size').value);
+            }
+            else if (key === 'petFreq') {
+                settings_obj[key] = parseInt(document.getElementById('pet-freq').value);
+            }
+            else if (key === 'clockSeconds') {
+                settings_obj[key] = document.getElementById('clock-seconds').checked;
+            }
             else {
                 settings_obj[key] = document.getElementById("show-" + key).checked;
             }
@@ -474,8 +644,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (settings_obj.useUnsplash) {
             localStorage.removeItem('unsplashData');
         }
-        showNotification("Settings Saved!", 2000, 'success', false);
-    })
+        let statusSpan = document.getElementById('auto-save-status');
+        if (statusSpan) {
+            statusSpan.classList.remove('hidden');
+            statusSpan.style.transition = 'none';
+            statusSpan.style.opacity = 1;
+            statusSpan.textContent = 'Saved!';
+            clearTimeout(statusSpan.timeout);
+            statusSpan.timeout = setTimeout(() => {
+                statusSpan.style.transition = 'opacity 1s';
+                statusSpan.style.opacity = 0;
+            }, 1000);
+        }
+    }
+
+    const inputElements = document.querySelectorAll('input, select, textarea');
+    inputElements.forEach(el => {
+        if (el.type === 'text' || el.tagName.toLowerCase() === 'textarea' || el.type === 'number') {
+            el.addEventListener('input', debounce(() => autoSaveSettings(), 400));
+        } else if (el.type === 'range') {
+            el.addEventListener('input', autoSaveSettings);
+        } else {
+            el.addEventListener('change', autoSaveSettings);
+        }
+    });
 
     const cityInput = document.getElementById('custom-city');
     const suggestionsContainer = document.getElementById('city-suggestions');
@@ -558,6 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
             draggingElement.classList.remove('dragging');
             draggingElement = null;
         }
+        autoSaveSettings();
     });
 
     widgetList.addEventListener('dragover', (e) => {
@@ -651,6 +844,10 @@ document.getElementById("show-pixelArt").onchange = (e) => {
     document.querySelector("#pixel-art-select-div").classList.toggle('disabled', !e.target.checked);
 }
 
+document.getElementById("show-bgAnimation").onchange = (e) => {
+    document.querySelector("#bg-animation-options").classList.toggle('disabled', !e.target.checked);
+}
+
 document.getElementById("pixel-art-select").onchange = (e) => {
     let selectedPixelArt = e.target.value;
     if (selectedPixelArt == "custom") {
@@ -670,36 +867,42 @@ let theme = localStorage.getItem('theme') || 'system';
 
 function applyTheme(theme) {
     document.body.classList.remove('dark', 'light');
-    if (theme === 'dark') {
+    let effectiveTheme = theme;
+
+    if (theme === 'adaptive') {
+        const hour = new Date().getHours();
+        effectiveTheme = (hour >= 6 && hour < 18) ? 'light' : 'dark';
+    } else if (theme === 'system') {
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    if (effectiveTheme === 'dark') {
         document.body.classList.add('dark');
-    } else if (theme === 'light') {
-        document.body.classList.add('light');
     } else {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.body.classList.add('dark');
-        } else {
-            document.body.classList.add('light');
-        }
+        document.body.classList.add('light');
     }
 }
 
 applyTheme(theme);
 
-    // Update About icons based on theme (light/dark/system)
-    function updateAboutIcons() {
-        const webstoreImg = document.getElementById('webstore-img');
-        const githubImg = document.getElementById('github-img');
-        if (!webstoreImg || !githubImg) return;
+// Update About icons based on theme (light/dark/system)
+function updateAboutIcons() {
+    const webstoreImg = document.getElementById('webstore-img');
+    const githubImg = document.getElementById('github-img');
+    if (!webstoreImg || !githubImg) return;
 
-        let effective = theme;
-        if (theme === 'system') {
-            effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-
-        webstoreImg.src = `favicons/chromewebstore-${effective}.png`;
-        githubImg.src = `favicons/github-${effective}.png`;
+    let effective = theme;
+    if (theme === 'system') {
+        effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } else if (theme === 'adaptive') {
+        const hour = new Date().getHours();
+        effective = (hour >= 6 && hour < 18) ? 'light' : 'dark';
     }
-    updateAboutIcons();
+
+    webstoreImg.src = `favicons/chromewebstore-${effective}.png`;
+    githubImg.src = `favicons/github-${effective}.png`;
+}
+updateAboutIcons();
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
     if (theme === 'system') {
@@ -715,7 +918,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 });
 
 // Easter egg: clicking on the app icon or title 10 times redirects to YouTube
-(function() {
+(function () {
     const CLICK_TARGET = 10;
     let clickCount = 0;
     const logo = document.getElementById('about-logo');
@@ -730,7 +933,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
             //     window.location.href = 'https://www.youtube.com/';
             // } catch (e) {
             //     window.open('https://www.youtube.com/', '_blank');
-                
+
             // }
         }
     }
@@ -772,13 +975,13 @@ document.getElementById('import-settings').addEventListener('click', () => {
 
 function handleImportFile(file) {
     if (!file) return;
-    
+
     // Check file type
     if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
         showNotification('Invalid file type. Please use a .json file.', 3000, 'error');
         return;
     }
-    
+
     // Check file size (max 1MB)
     if (file.size > 1024 * 1024) {
         showNotification('File too large. Maximum size is 1MB.', 3000, 'error');
@@ -795,13 +998,13 @@ function handleImportFile(file) {
                 showNotification('Invalid JSON format. File may be corrupted.', 3000, 'error');
                 return;
             }
-            
+
             // Validate that it's an object
             if (typeof importedSettings !== 'object' || importedSettings === null || Array.isArray(importedSettings)) {
                 showNotification('Invalid settings format. Expected a settings object.', 3000, 'error');
                 return;
             }
-            
+
             // Check if it looks like a settings file (has at least one known key)
             const knownKeys = ['clock', 'weather', 'bookmarks', 'theme', 'topRight', 'pixelArt', 'sidebar'];
             const hasKnownKey = knownKeys.some(key => importedSettings.hasOwnProperty(key));
@@ -812,7 +1015,7 @@ function handleImportFile(file) {
 
             // Merge with default settings to ensure all keys exist
             const mergedSettings = { ...defaultSettings, ...importedSettings };
-            
+
             localStorage.setItem('settings', JSON.stringify(mergedSettings));
             showNotification('Settings imported successfully! Reloading...', 2000, 'success', true);
         } catch (error) {
@@ -857,7 +1060,7 @@ dropTargets.forEach(target => {
         e.stopPropagation();
         dropZone.classList.remove('drag-over');
         importButton.classList.remove('drag-over');
-        
+
         const file = e.dataTransfer.files[0];
         handleImportFile(file);
     });

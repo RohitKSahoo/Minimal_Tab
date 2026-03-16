@@ -24,6 +24,7 @@
 
   <div class="clock" id="clock">--:--</div>
   <div class="weather" id="weather">Fetching weather...</div>
+  <div class="quote" id="quote"></div>
   <div class="shortcuts" id="shortcuts"></div>
 
   <div class="customize" id="customize" title="customize">
@@ -31,8 +32,11 @@
     <span class="customize-label">Customize</span>
   </div>
   <div class="photo-credit" id="photo-credit" style="display: none;">
-    Photo by <a id="photo-credit-link" target="_blank" rel="noopener noreferrer"></a> on <a href="https://unsplash.com/?utm_source=minimal_new_tab&utm_medium=referral" target="_blank" rel="noopener noreferrer">Unsplash</a>
-    <span class="refresh-background" id="refresh-background" title="Get new background" style="display: none;"><span class="refresh-icon"></span></span>
+    Photo by <a id="photo-credit-link" target="_blank" rel="noopener noreferrer"></a> on <a
+      href="https://unsplash.com/?utm_source=minimal_new_tab&utm_medium=referral" target="_blank"
+      rel="noopener noreferrer">Unsplash</a>
+    <span class="refresh-background" id="refresh-background" title="Get new background" style="display: none;"><span
+        class="refresh-icon"></span></span>
   </div>
   <div class="theme-toggle" title="Change theme">
     <span class="theme-icon"></span>
@@ -42,8 +46,12 @@
   <script src="defaultSettings.js"></script>
   <script type="module" src="main.js"></script>
   <script type="module" src="art.js"></script>
-  <script type="module" src="widgets/calendar.js"></script> 
+  <script type="module" src="widgets/calendar.js"></script>
   <script type="module" src="widgets/todo.js"></script>
+  <script type="module" src="widgets/pomodoro.js"></script>
+  <script type="module" src="widgets/notes.js"></script>
+  <script type="module" src="canvas-bg.js"></script>
+  <script type="module" src="pet.js"></script>
 </body>
 
 </html>
