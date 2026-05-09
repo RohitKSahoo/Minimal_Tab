@@ -139,8 +139,60 @@ function analyzeAndSetTextColor(imageUrl) {
         }
         const pixelCount = imageData.length / 4;
         const luminance = (0.299 * (r / pixelCount) + 0.587 * (g / pixelCount) + 0.114 * (b / pixelCount));
-        document.body.style.color = luminance > 128 ? '#222' : '#f0f0f0';
+        const isDarkBackground = luminance <= 128;
+        document.body.style.color = isDarkBackground ? '#f0f0f0' : '#222';
+        
+        const tray = document.querySelector('.bookmarks-tray');
+        if (tray) {
+            if (isDarkBackground) {
+                tray.style.background = 'rgba(25, 25, 25, 0.85)';
+                tray.style.color = '#f0f0f0';
+            } else {
+                tray.style.background = 'rgba(255, 255, 255, 0.95)';
+                tray.style.color = '#222';
+            }
+        }
     };
+}
+
+function analyzeAndSetTextColorFromVideo(video) {
+    video.addEventListener('loadeddata', () => {
+        setTimeout(() => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            const x = Math.floor(canvas.width / 4);
+            const y = Math.floor(canvas.height / 4);
+            const width = Math.floor(canvas.width / 2);
+            const height = Math.floor(canvas.height / 2);
+            const imageData = ctx.getImageData(x, y, width, height).data;
+
+            let r = 0, g = 0, b = 0;
+            for (let i = 0; i < imageData.length; i += 4) {
+                r += imageData[i];
+                g += imageData[i + 1];
+                b += imageData[i + 2];
+            }
+            const pixelCount = imageData.length / 4;
+            const luminance = (0.299 * (r / pixelCount) + 0.587 * (g / pixelCount) + 0.114 * (b / pixelCount));
+            const isDarkBackground = luminance <= 128;
+            document.body.style.color = isDarkBackground ? '#f0f0f0' : '#222';
+            
+            const tray = document.querySelector('.bookmarks-tray');
+            if (tray) {
+                if (isDarkBackground) {
+                    tray.style.background = 'rgba(25, 25, 25, 0.85)';
+                    tray.style.color = '#f0f0f0';
+                } else {
+                    tray.style.background = 'rgba(255, 255, 255, 0.95)';
+                    tray.style.color = '#222';
+                }
+            }
+        }, 200);
+    });
 }
 
 async function setUnsplashBackground(forceRefresh = false) {
@@ -273,34 +325,55 @@ function renderBookmarks(nodes, container, level = 0, path = "") {
             folderButton.appendChild(chevron);
             folderButton.appendChild(title);
 
-            const childrenList = document.createElement('ul');
-            childrenList.className = 'bookmark-children';
-
-            const isOpen = settings.expandBookmarks ? true : localStorage.getItem(currentPath) === "true";
-            if (isOpen) {
-                chevron.textContent = '▼';
-            } else {
-                childrenList.classList.add('collapsed');
-            }
-
             folderButton.addEventListener('click', () => {
-                const isCollapsed = childrenList.classList.contains('collapsed');
-                if (isCollapsed) {
-                    childrenList.classList.remove('collapsed');
-                    chevron.textContent = '▼';
-                    localStorage.setItem(currentPath, "true");
+                let flyout = document.getElementById('bookmarks-flyout');
+                if (!flyout) {
+                    flyout = document.createElement('div');
+                    flyout.id = 'bookmarks-flyout';
+                    flyout.className = 'bookmarks-tray';
+                    // Position to the right of the main tray
+                    flyout.style.left = '320px';
+                    flyout.style.top = '3rem';
+                    document.body.appendChild(flyout);
                 } else {
-                    childrenList.classList.add('collapsed');
-                    chevron.textContent = '▶';
-                    localStorage.setItem(currentPath, "false");
+                    flyout.innerHTML = ''; // Clear existing content
                 }
+
+                // Add header with folder title and close button
+                const header = document.createElement('div');
+                header.style.display = 'flex';
+                header.style.justifyContent = 'space-between';
+                header.style.alignItems = 'center';
+                header.style.marginBottom = '1rem';
+                header.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                header.style.paddingBottom = '0.5rem';
+                
+                const titleEl = document.createElement('h3');
+                titleEl.textContent = node.title;
+                titleEl.style.margin = '0';
+                titleEl.style.fontSize = '1.1rem';
+                
+                const closeBtn = document.createElement('span');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.style.fontSize = '1.5rem';
+                closeBtn.style.opacity = '0.7';
+                closeBtn.addEventListener('click', () => flyout.remove());
+                
+                header.appendChild(titleEl);
+                header.appendChild(closeBtn);
+                flyout.appendChild(header);
+
+                const ul = document.createElement('ul');
+                ul.className = 'bookmark-list';
+                flyout.appendChild(ul);
+
+                // Render children inside the flyout
+                renderBookmarks(node.children, ul, 0, currentPath);
             });
 
             listItem.appendChild(folderButton);
-            listItem.appendChild(childrenList);
             container.appendChild(listItem);
-
-            renderBookmarks(node.children, childrenList, level + 1, currentPath);
         } else if (node.url) {
             const listItem = document.createElement('li');
             listItem.className = 'bookmark-link-item';
@@ -339,7 +412,108 @@ if (settings.customCSS) {
     document.head.appendChild(styleElement);
 }
 
-if (settings.useUnsplash) {
+function createVideoElement(src) {
+    const video = document.createElement('video');
+    video.src = src;
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true; // Optimization
+    video.style.position = 'fixed';
+    video.style.top = '0';
+    video.style.left = '0';
+    video.style.width = '100vw';
+    video.style.height = '100vh';
+    video.style.objectFit = 'cover';
+    video.style.zIndex = '-2';
+    document.body.prepend(video);
+
+    // Optimization: Revoke object URL after video starts loading to free memory
+    if (src.startsWith('blob:')) {
+        video.addEventListener('loadedmetadata', () => {
+            URL.revokeObjectURL(src);
+        });
+    }
+    
+    // Pause video when tab is not visible to save memory/CPU
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            video.pause();
+        } else {
+            video.play();
+        }
+    });
+    
+    // Analyze video for text color
+    analyzeAndSetTextColorFromVideo(video);
+}
+
+if (settings.useVideoBackground) {
+    if (settings.useLocalVideos) {
+        const DB_NAME = 'MinimalTabVideos';
+        const DB_VERSION = 3;
+        const HANDLES_STORE = 'handles';
+
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onsuccess = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(HANDLES_STORE)) {
+                if (settings.backgroundVideo) createVideoElement(settings.backgroundVideo);
+                return;
+            }
+            
+            const transaction = db.transaction([HANDLES_STORE], 'readonly');
+            const store = transaction.objectStore(HANDLES_STORE);
+            const getRequest = store.get('videoFolder');
+            
+            getRequest.onsuccess = async () => {
+                const result = getRequest.result;
+                if (result && result.handle) {
+                    const handle = result.handle;
+                    
+                    // Verify permission
+                    const permission = await handle.queryPermission({ mode: 'read' });
+                    if (permission === 'granted') {
+                        const videos = [];
+                        for await (const entry of handle.values()) {
+                            if (entry.kind === 'file' && (entry.name.endsWith('.mp4') || entry.name.endsWith('.webm') || entry.name.endsWith('.mov'))) {
+                                videos.push(entry);
+                            }
+                        }
+                        
+                        if (videos.length > 0) {
+                            // Check if we already have a video selected for this session
+                            const currentVideoName = sessionStorage.getItem('currentVideo');
+                            let selectedEntry;
+                            
+                            if (currentVideoName) {
+                                selectedEntry = videos.find(v => v.name === currentVideoName);
+                            }
+                            
+                            // If not found or new session, pick a random one
+                            if (!selectedEntry) {
+                                selectedEntry = videos[Math.floor(Math.random() * videos.length)];
+                                sessionStorage.setItem('currentVideo', selectedEntry.name);
+                            }
+                            
+                            const file = await selectedEntry.getFile();
+                            createVideoElement(URL.createObjectURL(file));
+                        } else if (settings.backgroundVideo) {
+                            createVideoElement(settings.backgroundVideo);
+                        }
+                    } else {
+                        console.warn("Folder permission not granted. Fallback to URL.");
+                        if (settings.backgroundVideo) createVideoElement(settings.backgroundVideo);
+                    }
+                } else if (settings.backgroundVideo) {
+                    createVideoElement(settings.backgroundVideo);
+                }
+            };
+        };
+    } else if (settings.backgroundVideo) {
+        createVideoElement(settings.backgroundVideo);
+    }
+} else if (settings.useUnsplash) {
     setUnsplashBackground();
 } else if (settings.backgroundImage) {
     document.body.style.backgroundImage = `url(${settings.backgroundImage})`;
@@ -443,12 +617,43 @@ if (settings.bookmarks) {
             listRoot.className = 'bookmark-list';
             shortcuts.innerHTML = '';
 
-            renderBookmarks(
-                settings.bookmarkFolder?.trim() ? bookmarksBar.children : tree[0].children,
-                listRoot
-            );
+            const children = settings.bookmarkFolder?.trim() ? bookmarksBar.children : tree[0].children;
+            
+            renderBookmarks(children, listRoot);
 
-            shortcuts.appendChild(listRoot);
+            const trigger = document.createElement('div');
+            trigger.className = 'bookmarks-trigger';
+            trigger.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+            trigger.title = "Bookmarks";
+            
+            const tray = document.createElement('div');
+            tray.className = 'bookmarks-tray collapsed';
+            
+            // Apply initial contrast styles based on body text color
+            const isDarkBg = document.body.style.color === 'rgb(240, 240, 240)' || document.body.style.color === '#f0f0f0';
+            if (isDarkBg) {
+                tray.style.background = 'rgba(25, 25, 25, 0.85)';
+                tray.style.color = '#f0f0f0';
+            } else {
+                tray.style.background = 'rgba(255, 255, 255, 0.95)';
+                tray.style.color = '#222';
+            }
+            
+            tray.appendChild(listRoot);
+            shortcuts.appendChild(trigger);
+            shortcuts.appendChild(tray);
+            
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tray.classList.toggle('collapsed');
+            });
+            
+            // Close tray when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!tray.classList.contains('collapsed') && !tray.contains(e.target) && !trigger.contains(e.target)) {
+                    tray.classList.add('collapsed');
+                }
+            });
         });
     } else {
         document.getElementById('shortcuts').textContent = "Bookmarks not available outside of extension.";
@@ -558,10 +763,45 @@ if (settings.sidebar) {
     updateCustomizeVisibility();
 
     const handle = sidebar.querySelector('.sidebar-handle');
-    handle.addEventListener('click', () => {
+    
+    let autoCollapseTimer;
+    const AUTO_COLLAPSE_DELAY = 5000; // 5 seconds
+
+    function resetAutoCollapseTimer() {
+        clearTimeout(autoCollapseTimer);
+        if (!sidebar.classList.contains('minimised')) {
+            autoCollapseTimer = setTimeout(() => {
+                sidebar.classList.add('minimised');
+                updateCustomizeVisibility();
+            }, AUTO_COLLAPSE_DELAY);
+        }
+    }
+
+    // Reset timer on interaction
+    sidebar.addEventListener('mousemove', resetAutoCollapseTimer);
+    sidebar.addEventListener('click', resetAutoCollapseTimer);
+    sidebar.addEventListener('touchstart', resetAutoCollapseTimer);
+
+    handle.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent document click from closing it immediately
         sidebar.classList.toggle('minimised');
         updateCustomizeVisibility();
+        resetAutoCollapseTimer();
     });
+
+    // Close sidebar when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!sidebar.classList.contains('minimised') && !sidebar.contains(e.target)) {
+            sidebar.classList.add('minimised');
+            updateCustomizeVisibility();
+            clearTimeout(autoCollapseTimer);
+        }
+    });
+
+    // Initialize timer if sidebar is open on load
+    if (!sidebar.classList.contains('minimised')) {
+        resetAutoCollapseTimer();
+    }
 }
 if (settings.unsplashApiKey && settings.showUnsplashRefresh) {
     document.getElementById('refresh-background').addEventListener('click', () => {
@@ -576,13 +816,63 @@ const icons = {
 };
 
 const customizeIcon = {
-    "dark": `<svg fill="white" width="32px" height="32px" viewBox="-1 0 44 44"><path id="_45.Settings" data-name="45.Settings" d="M35,22H13A10,10,0,0,1,13,2H35a10,10,0,0,1,0,20ZM35,4H13a8,8,0,0,0,0,16H35A8,8,0,0,0,35,4ZM13,18a6,6,0,1,1,6-6A6,6,0,0,1,13,18ZM13,8a4,4,0,1,0,4,4A4,4,0,0,0,13,8Zm0,18H35a10,10,0,0,1,0,20H13a10,10,0,0,1,0-20Zm0,18H35a8,8,0,0,0,0-16H13a8,8,0,0,0,0,16ZM35,30a6,6,0,1,1-6,6A6,6,0,0,1,35,30Zm0,10a4,4,0,1,0-4-4A4,4,0,0,0,35,40Z" transform="translate(-3 -2)" fill-rule="evenodd"/></svg>`,
-    "light": `<svg fill="black" width="32px" height="32px" viewBox="-1 0 44 44"><path id="_45.Settings" data-name="45.Settings" d="M35,22H13A10,10,0,0,1,13,2H35a10,10,0,0,1,0,20ZM35,4H13a8,8,0,0,0,0,16H35A8,8,0,0,0,35,4ZM13,18a6,6,0,1,1,6-6A6,6,0,0,1,13,18ZM13,8a4,4,0,1,0,4,4A4,4,0,0,0,13,8Zm0,18H35a10,10,0,0,1,0,20H13a10,10,0,0,1,0-20Zm0,18H35a8,8,0,0,0,0-16H13a8,8,0,0,0,0,16ZM35,30a6,6,0,1,1-6,6A6,6,0,0,1,35,30Zm0,10a4,4,0,1,0-4-4A4,4,0,0,0,35,40Z" transform="translate(-3 -2)" fill-rule="evenodd"/></svg>`
+    "dark": `<svg fill="currentColor" width="32px" height="32px" viewBox="-1 0 44 44"><path id="_45.Settings" data-name="45.Settings" d="M35,22H13A10,10,0,0,1,13,2H35a10,10,0,0,1,0,20ZM35,4H13a8,8,0,0,0,0,16H35A8,8,0,0,0,35,4ZM13,18a6,6,0,1,1,6-6A6,6,0,0,1,13,18ZM13,8a4,4,0,1,0,4,4A4,4,0,0,0,13,8Zm0,18H35a10,10,0,0,1,0,20H13a10,10,0,0,1,0-20Zm0,18H35a8,8,0,0,0,0-16H13a8,8,0,0,0,0,16ZM35,30a6,6,0,1,1-6,6A6,6,0,0,1,35,30Zm0,10a4,4,0,1,0-4-4A4,4,0,0,0,35,40Z" transform="translate(-3 -2)" fill-rule="evenodd"/></svg>`,
+    "light": `<svg fill="currentColor" width="32px" height="32px" viewBox="-1 0 44 44"><path id="_45.Settings" data-name="45.Settings" d="M35,22H13A10,10,0,0,1,13,2H35a10,10,0,0,1,0,20ZM35,4H13a8,8,0,0,0,0,16H35A8,8,0,0,0,35,4ZM13,18a6,6,0,1,1,6-6A6,6,0,0,1,13,18ZM13,8a4,4,0,1,0,4,4A4,4,0,0,0,13,8Zm0,18H35a10,10,0,0,1,0,20H13a10,10,0,0,1,0-20Zm0,18H35a8,8,0,0,0,0-16H13a8,8,0,0,0,0,16ZM35,30a6,6,0,1,1-6,6A6,6,0,0,1,35,30Zm0,10a4,4,0,1,0-4-4A4,4,0,0,0,35,40Z" transform="translate(-3 -2)" fill-rule="evenodd"/></svg>`
 }
 
-document.getElementById("customize").addEventListener("click", () => {
-    location.href = "/options.html";
-})
+    const modal = document.getElementById('settings-modal');
+    const iframe = document.getElementById('settings-iframe');
+
+    function applyLiveSettings() {
+        const settings = JSON.parse(localStorage.getItem("settings")) || defaultSettings;
+        
+        // Clock
+        const clockEl = document.getElementById("clock");
+        if (clockEl) clockEl.style.display = settings.clock ? 'block' : 'none';
+        
+        // Weather
+        const weatherEl = document.getElementById("weather");
+        if (weatherEl) weatherEl.style.display = settings.weather ? 'block' : 'none';
+        
+        // Quote
+        const quoteEl = document.getElementById("quote");
+        if (quoteEl) quoteEl.style.display = settings.quote ? 'block' : 'none';
+        
+        // Auto Hide
+        if (settings.autoHide) {
+            document.body.classList.add('auto-hide');
+        } else {
+            document.body.classList.remove('auto-hide');
+        }
+        
+        // Bookmarks visibility
+        const shortcutsEl = document.getElementById("shortcuts");
+        if (shortcutsEl) shortcutsEl.style.display = settings.bookmarks ? 'flex' : 'none';
+    }
+
+    document.getElementById("customize").addEventListener("click", () => {
+        iframe.src = "options.html";
+        modal.classList.remove('hidden');
+    });
+
+    document.querySelector('.modal-overlay').addEventListener('click', () => {
+        modal.classList.add('hidden');
+        iframe.src = "";
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            modal.classList.add('hidden');
+            iframe.src = "";
+        }
+    });
+
+    // Detect if settings were changed in the iframe and apply live
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'settings') {
+            applyLiveSettings();
+        }
+    });
 
 // Initialize theme
 let theme = localStorage.getItem('theme') || 'system';

@@ -197,6 +197,33 @@
                     </div>
                 </div>
 
+                <label class="checkbox-label"><input type="checkbox" id="use-video-background"><span
+                        class="custom-checkbox"></span> Use Video Background</label>
+                <div id="video-background-options" class="sub-settings">
+                    <div class="setting-row">
+                        <label for="video-background-url">Video URL (MP4/WebM):</label>
+                        <input type="text" id="video-background-url" placeholder="Enter video URL (e.g., https://example.com/video.mp4)">
+                    </div>
+                    <p style="font-size: 0.8em; opacity: 0.7; margin-top: 0.3em; margin-bottom: 1em;">
+                        Note: Large videos may take time to load. Use a URL to avoid local storage limits.
+                    </p>
+                    
+                    <div class="setting-row" style="margin-top: 15px;">
+                        <label class="checkbox-label"><input type="checkbox" id="use-local-videos"><span
+                                class="custom-checkbox"></span> Use Local Videos from Folder</label>
+                    </div>
+                    <div id="local-video-options" class="sub-settings" style="display: none; margin-top: 10px;">
+                        <div class="setting-row">
+                            <button id="select-video-folder" class="ghost-button">Select Video Folder</button>
+                        </div>
+                        <p style="font-size: 0.8em; opacity: 0.7; margin-top: 0.3em;">
+                            Select a folder containing MP4 or WebM videos. The extension will read directly from this folder.
+                        </p>
+                        <div id="loaded-videos-count" style="font-size: 0.85em; opacity: 0.8; margin-top: 8px;"></div>
+                        <button id="clear-local-videos" class="ghost-button" style="margin-top: 8px; font-size: 12px; padding: 4px 8px;">Clear Folder Access</button>
+                    </div>
+                </div>
+
                 <label class="checkbox-label"><input type="checkbox" id="show-pixelArt"><span
                         class="custom-checkbox"></span>Show Background Pixel Art</label>
 
@@ -272,6 +299,7 @@ body { font-family: 'Comic Sans MS'; }
                     <div class="setting-row">
                         <label for="bgAnimationType">Animation Type: </label>
                         <select id="bgAnimationType" name="bgAnimationType">
+                            <option value="random">Random (Every New Tab)</option>
                             <option value="particles">Particles (Interactive)</option>
                             <option value="gravity">Gravity Playground</option>
                             <option value="generative">Generative Art Paint</option>

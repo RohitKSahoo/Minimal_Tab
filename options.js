@@ -22,6 +22,94 @@ async function fetchCitySuggestions(query) {
     }
 }
 
+const DB_NAME = 'MinimalTabVideos';
+const DB_VERSION = 3; // Increment version for new store
+const STORE_NAME = 'videos';
+const HANDLES_STORE = 'handles';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: 'name' });
+            }
+            if (!db.objectStoreNames.contains(HANDLES_STORE)) {
+                db.createObjectStore(HANDLES_STORE, { keyPath: 'key' });
+            }
+        };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function saveFolderHandle(key, handle) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([HANDLES_STORE], 'readwrite');
+        const store = transaction.objectStore(HANDLES_STORE);
+        const request = store.put({ key, handle });
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function getFolderHandle(key) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([HANDLES_STORE], 'readonly');
+        const store = transaction.objectStore(HANDLES_STORE);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result ? request.result.handle : null);
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function clearFolderHandle(key) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([HANDLES_STORE], 'readwrite');
+        const store = transaction.objectStore(HANDLES_STORE);
+        const request = store.delete(key);
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function saveVideo(name, blob) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.put({ name, blob });
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function clearVideos() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function getVideosCount() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
 function showNotification(message, duration = 2000, type = 'success', reload = false) {
     const notification = document.getElementById('notification');
     notification.textContent = message;
@@ -53,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "selectedPixelArt", "customSVG", "pixelArtOpacity", "pixelArtDensity", "pixelArtColorDark", "pixelArtColorLight", "availableWidgets", "theme", "backgroundImage",
         "bgAnimation", "bgAnimationType", "bgAnimationSpeed", "bgAnimationDensity",
         "sidebar", "sidebarPosition", "sidebarWidgets", "sidebarExpanded", "sidebarShowCustomize", "autoHide", "useUnsplash", "unsplashApiKey", "unsplashUpdateFrequency",
-        "showUnsplashRefresh", "customCSS"
+        "showUnsplashRefresh", "customCSS", "useVideoBackground", "backgroundVideo", "useLocalVideos"
     ];
 
     let settingsJsonStr = localStorage.getItem("settings") || JSON.stringify(defaultSettings);
@@ -63,6 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
             settings[key] = defaultSettings[key];
         }
     });
+
+
     if (settings['clock']) {
         document.getElementById("show-clock").checked = true;
     };
@@ -223,6 +313,37 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         document.getElementById('unsplash-options').style.display = 'none';
     }
+
+    const useVideoBackgroundCheckbox = document.getElementById('use-video-background');
+    if (settings.useVideoBackground) {
+        useVideoBackgroundCheckbox.checked = true;
+        document.getElementById('video-background-options').style.display = 'block';
+    } else {
+        document.getElementById('video-background-options').style.display = 'none';
+    }
+    document.getElementById('video-background-url').value = settings.backgroundVideo || '';
+
+    const useLocalVideosCheckbox = document.getElementById('use-local-videos');
+    if (settings.useLocalVideos) {
+        useLocalVideosCheckbox.checked = true;
+        document.getElementById('local-video-options').style.display = 'block';
+    } else {
+        document.getElementById('local-video-options').style.display = 'none';
+    }
+
+    async function updateStoredVideosCount() {
+        try {
+            const handle = await getFolderHandle('videoFolder');
+            if (handle) {
+                document.getElementById('loaded-videos-count').textContent = `Folder selected: ${handle.name}`;
+            } else {
+                document.getElementById('loaded-videos-count').textContent = `No folder selected.`;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    updateStoredVideosCount();
 
     document.getElementById('unsplash-api-key').value = settings.unsplashApiKey || '';
     const unsplashApiKeyInput = document.getElementById('unsplash-api-key');
@@ -603,6 +724,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             else if (key === 'backgroundImage') {
                 settings_obj[key] = settings.backgroundImage || "";
+            } else if (key === 'useVideoBackground') {
+                settings_obj[key] = document.getElementById('use-video-background').checked;
+            } else if (key === 'backgroundVideo') {
+                settings_obj[key] = document.getElementById('video-background-url').value.trim();
+            } else if (key === 'useLocalVideos') {
+                settings_obj[key] = document.getElementById('use-local-videos').checked;
             } else if (key === 'useUnsplash') {
                 settings_obj[key] = document.getElementById('use-unsplash').checked;
                 if (settings_obj[key]) {
@@ -685,6 +812,36 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('use-unsplash').addEventListener('change', (e) => {
         document.getElementById('unsplash-options').style.display = e.target.checked ? 'block' : 'none';
         toggleUnsplashAdvancedOptions();
+    });
+
+    document.getElementById('use-video-background').addEventListener('change', (e) => {
+        document.getElementById('video-background-options').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('use-local-videos').addEventListener('change', (e) => {
+        document.getElementById('local-video-options').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('select-video-folder').addEventListener('click', async () => {
+        try {
+            const handle = await window.showDirectoryPicker();
+            await saveFolderHandle('videoFolder', handle);
+            showNotification("Folder selected successfully!", 2000, 'success');
+            updateStoredVideosCount();
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error(err);
+                showNotification(`Failed to select folder: ${err.message}`, 3000, 'error');
+            }
+        }
+    });
+
+    document.getElementById('clear-local-videos').addEventListener('click', async () => {
+        if (confirm("Are you sure you want to clear folder access?")) {
+            await clearFolderHandle('videoFolder');
+            showNotification("Folder access cleared.", 2000, 'success');
+            updateStoredVideosCount();
+        }
     });
 
     const onCityInput = debounce(async (e) => {
@@ -806,6 +963,8 @@ document.addEventListener('DOMContentLoaded', () => {
         clearBgButton.classList.add('hidden');
         showNotification("Background image cleared.", 2000, 'restore', false);
     });
+
+    initCustomSelects();
 });
 
 document.getElementById("show-weather").addEventListener('change', (e) => {
@@ -1065,3 +1224,82 @@ dropTargets.forEach(target => {
         handleImportFile(file);
     });
 });
+
+function initCustomSelects() {
+    const selects = document.querySelectorAll('#options-wrapper select');
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.custom-select-wrapper.open').forEach(w => w.classList.remove('open'));
+    });
+
+    selects.forEach(select => {
+        if (select.nextElementSibling && select.nextElementSibling.classList.contains('custom-select-wrapper')) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'custom-select-wrapper';
+        
+        const trigger = document.createElement('div');
+        trigger.className = 'custom-select-trigger';
+        
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'custom-options';
+        
+        const updateTrigger = () => {
+            if (select.selectedIndex >= 0) {
+                trigger.textContent = select.options[select.selectedIndex].textContent;
+            }
+        };
+
+        const buildOptions = () => {
+            optionsContainer.innerHTML = '';
+            Array.from(select.options).forEach((option, index) => {
+                const customOption = document.createElement('div');
+                customOption.className = 'custom-option' + (index === select.selectedIndex ? ' selected' : '');
+                customOption.textContent = option.textContent;
+                customOption.dataset.value = option.value;
+                
+                customOption.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    select.value = option.value;
+                    select.dispatchEvent(new Event('change'));
+                    updateTrigger();
+                    optionsContainer.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+                    customOption.classList.add('selected');
+                    wrapper.classList.remove('open');
+                });
+                
+                optionsContainer.appendChild(customOption);
+            });
+        };
+        
+        buildOptions();
+        updateTrigger();
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = wrapper.classList.contains('open');
+            document.querySelectorAll('.custom-select-wrapper.open').forEach(w => {
+                if (w !== wrapper) w.classList.remove('open');
+            });
+            wrapper.classList.toggle('open', !isOpen);
+        });
+        
+        wrapper.appendChild(trigger);
+        wrapper.appendChild(optionsContainer);
+        select.parentNode.insertBefore(wrapper, select.nextElementSibling);
+        
+        // Sync custom select when native select changes (e.g. from options.js logic)
+        select.addEventListener('change', () => {
+            updateTrigger();
+            buildOptions();
+        });
+
+        // Watch for dynamic option changes
+        const observer = new MutationObserver(() => {
+            buildOptions();
+            updateTrigger();
+        });
+        observer.observe(select, { childList: true });
+    });
+}

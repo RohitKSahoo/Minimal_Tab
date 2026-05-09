@@ -14,7 +14,8 @@ if (settingsJSON.bgAnimation) {
     canvas.style.pointerEvents = 'none';
     document.body.prepend(canvas);
 
-    const type = settingsJSON.bgAnimationType || 'particles';
+    const animations = ['particles', 'gravity', 'generative', 'fluid', 'rain', 'snow', 'petals', 'matrix'];
+    const type = settingsJSON.bgAnimationType === 'random' ? animations[Math.floor(Math.random() * animations.length)] : (settingsJSON.bgAnimationType || 'particles');
     const isWebGL = type === 'fluid';
     const gl = isWebGL ? (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) : null;
     const ctx = isWebGL ? null : canvas.getContext('2d');

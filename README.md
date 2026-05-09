@@ -30,15 +30,15 @@ New features added in this fork:
 
 * 🐾 **Animated Pets** — A small pet (dog, cat, rabbit, etc.) walks along the footer for a playful touch.
 * 💬 **Motivational Quotes** — Inspirational quotes appear below the weather section.
-* 🎨 **Interactive Backgrounds** — Mouse-responsive backgrounds with optimized performance:
-
-  * Rain
-  * Matrix
-  * Petals
-  * Gravitational particles etc.
+* 🎨 **Interactive Backgrounds** — Mouse-responsive backgrounds with optimized performance (Rain, Matrix, Petals, etc.).
 * 🔗 **Custom Shortcuts** — Ability to add your own quick-access website shortcuts.
 * 🧰 **Expanded Sidebar Tools** — Additional useful tools integrated into the sidebar.
-* 🗃️ Auto-save feature added.
+* 🗃️ **Auto-save** — Settings are saved automatically on change.
+* 🔮 **Glassmorphism UI** — Premium frosted glass effect applied to the sidebar, settings modal, and bookmarks tray.
+* 📁 **Bookmarks App Tray** — Bookmarks are organized in a clean app tray with a flyout menu for folders to prevent long lists.
+* ⚙️ **Pop-up Customize Menu** — Settings open as a seamless modal overlay without interrupting the video background or changing it.
+* ⚡ **Live Settings Application** — Toggling visual elements in settings applies changes instantly in the background.
+* 🔋 **Memory Optimizations** — Reduced RAM usage for video backgrounds by releasing file references immediately after loading.
 
 All new visual effects are designed to remain **lightweight and memory-efficient** so the new tab page stays fast and responsive.
 
