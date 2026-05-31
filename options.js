@@ -890,6 +890,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Handle hash to deep-link into specific tab (e.g. options.html#shortcuts)
+    const hash = window.location.hash;
+    if (hash) {
+        const targetId = hash.substring(1);
+        const targetLink = Array.from(navLinks).find(l => l.getAttribute('href') === `#${targetId}`);
+        if (targetLink) {
+            targetLink.click();
+        }
+    }
+
     const widgetList = document.getElementById('sidebar-widgets');
     let draggingElement = null;
 
@@ -985,11 +995,7 @@ document.getElementById("custom-city").addEventListener('input', () => {
 });
 
 
-document.getElementById("restore-defaults").addEventListener("click", () => {
-    localStorage.removeItem("settings");
-    localStorage.setItem("settings", JSON.stringify(defaultSettings));
-    showNotification("Settings restored to defaults! Reloading...", 2000, 'restore', true);
-});
+
 
 document.getElementById("show-bookmarks").onchange = (e) => {
     document.querySelector("#bookmark-folder-selector-span").classList.toggle('disabled', !e.target.checked);

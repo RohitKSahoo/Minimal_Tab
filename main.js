@@ -680,8 +680,92 @@ if (settings.topRight) {
             });
             container.append(itemElem);
         }
+    });
 
-    })
+    // Add mini + icon below the shortcut section in a separate box
+    const addBtn = document.createElement("div");
+    addBtn.id = "add-shortcut-btn";
+    addBtn.title = "Add Shortcut";
+    
+    // Create a thin premium plus icon using CSS inside the div
+    const plusLine1 = document.createElement("div");
+    plusLine1.style.position = "absolute";
+    plusLine1.style.width = "10px";
+    plusLine1.style.height = "1.5px";
+    plusLine1.style.background = "currentColor";
+    const plusLine2 = document.createElement("div");
+    plusLine2.style.position = "absolute";
+    plusLine2.style.width = "1.5px";
+    plusLine2.style.height = "10px";
+    plusLine2.style.background = "currentColor";
+    addBtn.appendChild(plusLine1);
+    addBtn.appendChild(plusLine2);
+    
+    // Position absolutely relative to the top-right container
+    addBtn.style.position = "absolute";
+    addBtn.style.bottom = "-24px"; // Hang below the box
+    addBtn.style.right = "20px"; // Inset to avoid rounded corners
+    addBtn.style.width = "24px";
+    addBtn.style.height = "24px";
+    addBtn.style.display = "flex";
+    addBtn.style.alignItems = "center";
+    addBtn.style.justifyContent = "center";
+    addBtn.style.background = "rgba(255, 255, 255, 0.05)"; // Match parent background exactly
+    addBtn.style.backdropFilter = "blur(15px)";
+    addBtn.style.borderRadius = "0 0 6px 6px"; // Rounded bottom only
+    addBtn.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+    addBtn.style.borderTop = "none"; // No top border to clash
+    addBtn.style.cursor = "pointer";
+    addBtn.style.opacity = "0";
+    addBtn.style.transform = "scaleY(0)"; // Scale vertically!
+    addBtn.style.transformOrigin = "top center"; // Grow down from the edge
+    addBtn.style.pointerEvents = "none";
+    addBtn.style.boxShadow = "0 4px 10px rgba(0, 0, 0, 0.1)"; // Subtle shadow for depth
+    addBtn.style.transition = "background 0.2s, opacity 0.3s ease, transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)"; // Super smooth ease
+    
+    let hideTimeout;
+    
+    // Show on container hover
+    container.addEventListener('mouseenter', () => {
+        clearTimeout(hideTimeout);
+        addBtn.style.opacity = "0.7";
+        addBtn.style.transform = "scaleY(1)";
+        addBtn.style.pointerEvents = "auto";
+    });
+    
+    container.addEventListener('mouseleave', () => {
+        // Stay for 2 seconds before hiding
+        hideTimeout = setTimeout(() => {
+            addBtn.style.opacity = "0";
+            addBtn.style.transform = "scaleY(0)";
+            addBtn.style.pointerEvents = "none";
+        }, 2000);
+    });
+    
+    // Brighten on button hover
+    addBtn.addEventListener('mouseenter', () => {
+        clearTimeout(hideTimeout);
+        addBtn.style.opacity = "1";
+        addBtn.style.background = "rgba(255, 255, 255, 0.25)";
+    });
+    addBtn.addEventListener('mouseleave', () => {
+        addBtn.style.opacity = "0.7";
+        addBtn.style.background = "rgba(255, 255, 255, 0.05)";
+        // Restart timeout when leaving the button
+        hideTimeout = setTimeout(() => {
+            addBtn.style.opacity = "0";
+            addBtn.style.transform = "scaleY(0)";
+            addBtn.style.pointerEvents = "none";
+        }, 2000);
+    });
+    
+    addBtn.addEventListener('click', () => {
+        const modal = document.getElementById('settings-modal');
+        const iframe = document.getElementById('settings-iframe');
+        iframe.src = "options.html#shortcuts"; // Deep-link to shortcuts tab!
+        modal.classList.remove('hidden');
+    });
+    container.appendChild(addBtn);
 }
 else {
     document.getElementById('top-right').style.display = 'none';
