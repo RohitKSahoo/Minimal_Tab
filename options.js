@@ -138,9 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const settings_keys = [
         "clock", "clockSeconds", "weather", "quote", "pet", "petType", "petSize", "petFreq", "useCustomCity", "customCity", "tempUnit", "bookmarks", "bookmarkFolder", "expandBookmarks", "topRight", "topRightOrder", "pixelArt",
-        "selectedPixelArt", "customSVG", "pixelArtOpacity", "pixelArtDensity", "pixelArtColorDark", "pixelArtColorLight", "availableWidgets", "theme", "backgroundImage",
+        "selectedPixelArt", "customSVG", "pixelArtOpacity", "pixelArtDensity", "pixelArtColorDark", "pixelArtColorLight", "availableWidgets", "backgroundImage",
         "bgAnimation", "bgAnimationType", "bgAnimationSpeed", "bgAnimationDensity",
-        "sidebar", "sidebarPosition", "sidebarWidgets", "sidebarExpanded", "sidebarShowCustomize", "autoHide", "useUnsplash", "unsplashApiKey", "unsplashUpdateFrequency",
+        "sidebar", "sidebarPosition", "sidebarWidgets", "sidebarExpanded", "sidebarShowCustomize", "useUnsplash", "unsplashApiKey", "unsplashUpdateFrequency",
         "showUnsplashRefresh", "customCSS", "useVideoBackground", "backgroundVideo", "useLocalVideos"
     ];
 
@@ -270,9 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settings['sidebarExpanded']) {
         document.getElementById("sidebar-expanded-check").checked = true;
     }
-    if (settings['autoHide']) {
-        document.getElementById("show-autoHide").checked = true;
-    }
+
     // Initialize and enforce dependency for sidebar Customize button visibility
     if (settings['sidebarShowCustomize'] === undefined) settings['sidebarShowCustomize'] = true;
     const sidebarShowCustomizeCheckbox = document.getElementById('sidebar-show-customize');
@@ -296,10 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     updateCustomizeDependency();
-    const theme = localStorage.getItem('theme') || 'system';
-    if (document.querySelector(`input[name="theme"][value="${theme}"]`)) {
-        document.querySelector(`input[name="theme"][value="${theme}"]`).checked = true;
-    }
+
 
     // Handle background image preview
     const bgPreview = document.getElementById('background-preview');
@@ -697,9 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else if (key === 'tempUnit') {
                 settings_obj[key] = document.querySelector('input[name="temp-unit"]:checked').value;
-            } else if (key === 'theme') {
-                const selectedTheme = document.querySelector('input[name="theme"]:checked').value;
-                localStorage.setItem('theme', selectedTheme);
+
             } else if (key === 'sidebarPosition') {
                 settings_obj[key] = document.querySelector('input[name="sidebar-position"]:checked').value;
             } else if (key === 'sidebarExpanded') {
@@ -938,11 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    document.querySelectorAll('input[name="theme"]').forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            applyTheme(e.target.value);
-        });
-    });
+
 
     document.getElementById('background-image-input').addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -1028,27 +1017,12 @@ document.getElementById("show-sidebar").onchange = (e) => {
 }
 
 
-let theme = localStorage.getItem('theme') || 'system';
-
-function applyTheme(theme) {
+function applyTheme() {
     document.body.classList.remove('dark', 'light');
-    let effectiveTheme = theme;
-
-    if (theme === 'adaptive') {
-        const hour = new Date().getHours();
-        effectiveTheme = (hour >= 6 && hour < 18) ? 'light' : 'dark';
-    } else if (theme === 'system') {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
-    if (effectiveTheme === 'dark') {
-        document.body.classList.add('dark');
-    } else {
-        document.body.classList.add('light');
-    }
+    document.body.classList.add('light');
 }
 
-applyTheme(theme);
+applyTheme();
 
 // Update About icons based on theme (light/dark/system)
 function updateAboutIcons() {
@@ -1056,31 +1030,10 @@ function updateAboutIcons() {
     const githubImg = document.getElementById('github-img');
     if (!webstoreImg || !githubImg) return;
 
-    let effective = theme;
-    if (theme === 'system') {
-        effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    } else if (theme === 'adaptive') {
-        const hour = new Date().getHours();
-        effective = (hour >= 6 && hour < 18) ? 'light' : 'dark';
-    }
-
-    webstoreImg.src = `favicons/chromewebstore-${effective}.png`;
-    githubImg.src = `favicons/github-${effective}.png`;
+    webstoreImg.src = `favicons/chromewebstore-light.png`;
+    githubImg.src = `favicons/github-light.png`;
 }
 updateAboutIcons();
-
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (theme === 'system') {
-        applyTheme('system');
-    }
-});
-
-// Keep About icons in sync when system theme changes while in 'system' mode
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (theme === 'system') {
-        try { updateAboutIcons(); } catch (err) { /* ignore */ }
-    }
-});
 
 // Easter egg: clicking on the app icon or title 10 times redirects to YouTube
 (function () {

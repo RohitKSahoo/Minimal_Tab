@@ -74,23 +74,5 @@ if (pixelArtSettings) {
     document.querySelectorAll(".art-cell svg").forEach(cell => {
         cell.style.opacity = pixelArtOptionsDict["pixelArtOpacity"] / 100;
     });
-    let theme = localStorage.getItem('theme') || 'system';
-    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
-    if (theme == "dark") {
-        document.documentElement.style.setProperty('--color-accent', pixelArtOptionsDict["pixelArtColorDark"]);
-
-    }
-    else if (theme == "light") {
-        document.documentElement.style.setProperty('--color-accent', pixelArtOptionsDict["pixelArtColorLight"]);
-    }
-    else {
-        const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
-
-        if (prefersDarkScheme.matches) {
-            document.documentElement.style.setProperty('--color-accent', pixelArtOptionsDict["pixelArtColorDark"]);
-        }
-        else {
-            document.documentElement.style.setProperty('--color-accent', pixelArtOptionsDict["pixelArtColorLight"]);
-        }
-    }
+    document.documentElement.style.setProperty('--color-accent', pixelArtOptionsDict["pixelArtColorLight"]);
 }

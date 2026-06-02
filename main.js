@@ -14,10 +14,6 @@ function updateClock() {
         timeStr += `:${secs}`;
     }
     document.getElementById('clock').textContent = timeStr;
-
-    if (localStorage.getItem('theme') === 'adaptive' && secs === '00') {
-        applyTheme('adaptive');
-    }
 }
 
 const weatherCodes = {
@@ -200,18 +196,8 @@ async function setUnsplashBackground(forceRefresh = false) {
     const cachedData = localStorage.getItem('unsplashData');
     const userApiKey = settings.unsplashApiKey;
 
-    let currentTheme = localStorage.getItem('theme') || 'system';
+    let currentTheme = 'light';
     let themeQuery = '';
-    if (currentTheme === 'system') {
-        currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    } else if (currentTheme === 'adaptive') {
-        const hour = new Date().getHours();
-        currentTheme = (hour >= 6 && hour < 18) ? 'light' : 'dark';
-    }
-
-    if (currentTheme === 'dark') {
-        themeQuery = ',dark';
-    }
 
     const frequencyMap = {
         '15min': 15 * 60 * 1000,
@@ -278,31 +264,91 @@ async function setUnsplashBackground(forceRefresh = false) {
     }
 }
 
-function applyTheme(theme) {
+function applyTheme() {
     document.body.classList.remove('dark', 'light');
-    let effectiveTheme = theme;
+    document.body.classList.add('light');
 
-    if (theme === 'adaptive') {
-        const hour = new Date().getHours();
-        effectiveTheme = (hour >= 6 && hour < 18) ? 'light' : 'dark';
-    } else if (theme === 'system') {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (customizeContainer) {
+        customizeContainer.innerHTML = customizeIcon['light'];
     }
-
-    if (effectiveTheme === 'dark') {
-        document.body.classList.add('dark');
-    } else {
-        document.body.classList.add('light');
-    }
-
-    const iconContainer = document.querySelector('.theme-icon');
-    const label = document.querySelector('.theme-label');
-    iconContainer.innerHTML = icons[theme];
-    label.textContent = theme[0].toUpperCase() + theme.slice(1);
-
-    const customizeContainer = document.querySelector('.customize-icon');
-    customizeContainer.innerHTML = customizeIcon[effectiveTheme];
 }
+
+let activeBookmarkIdToDelete = null;
+let activeBookmarkItemElement = null;
+let activeBookmarkIsFolder = false;
+
+function showBookmarkContextMenu(x, y, bookmarkId, element, isFolder) {
+    let menu = document.getElementById('bookmark-context-menu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'bookmark-context-menu';
+        menu.className = 'context-menu';
+        menu.innerHTML = `<div class="context-menu-item delete">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            Delete
+        </div>`;
+        document.body.appendChild(menu);
+
+        menu.querySelector('.delete').addEventListener('click', () => {
+            if (activeBookmarkIdToDelete) {
+                const confirmMsg = activeBookmarkIsFolder 
+                    ? "Are you sure you want to delete this folder and all its contents?" 
+                    : "Are you sure you want to delete this bookmark?";
+                if (confirm(confirmMsg)) {
+                    if (typeof chrome !== 'undefined' && chrome.bookmarks) {
+                        const removeFn = activeBookmarkIsFolder 
+                            ? chrome.bookmarks.removeTree 
+                            : chrome.bookmarks.remove;
+                        removeFn(activeBookmarkIdToDelete, () => {
+                            if (activeBookmarkItemElement) {
+                                activeBookmarkItemElement.remove();
+                            }
+                            hideBookmarkContextMenu();
+                        });
+                    } else {
+                        // fallback for testing/development outside of extension
+                        if (activeBookmarkItemElement) {
+                            activeBookmarkItemElement.remove();
+                        }
+                        hideBookmarkContextMenu();
+                    }
+                }
+            }
+        });
+    }
+
+    activeBookmarkIdToDelete = bookmarkId;
+    activeBookmarkItemElement = element;
+    activeBookmarkIsFolder = isFolder;
+
+    // Position menu and show
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.classList.add('visible');
+}
+
+function hideBookmarkContextMenu() {
+    const menu = document.getElementById('bookmark-context-menu');
+    if (menu) {
+        menu.classList.remove('visible');
+    }
+    activeBookmarkIdToDelete = null;
+    activeBookmarkItemElement = null;
+    activeBookmarkIsFolder = false;
+}
+
+// Event listeners to hide the context menu
+document.addEventListener('click', () => hideBookmarkContextMenu());
+document.addEventListener('contextmenu', (e) => {
+    if (!e.target.closest('.shortcut') && !e.target.closest('.bookmark-folder')) {
+        hideBookmarkContextMenu();
+    }
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        hideBookmarkContextMenu();
+    }
+});
 
 function renderBookmarks(nodes, container, level = 0, path = "") {
     nodes.forEach(node => {
@@ -324,6 +370,12 @@ function renderBookmarks(nodes, container, level = 0, path = "") {
 
             folderButton.appendChild(chevron);
             folderButton.appendChild(title);
+
+            folderButton.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showBookmarkContextMenu(e.clientX, e.clientY, node.id, listItem, true);
+            });
 
             folderButton.addEventListener('click', () => {
                 let flyout = document.getElementById('bookmarks-flyout');
@@ -390,6 +442,12 @@ function renderBookmarks(nodes, container, level = 0, path = "") {
                 } else {
                     window.location.href = node.url;
                 }
+            });
+
+            a.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showBookmarkContextMenu(e.clientX, e.clientY, node.id, listItem, false);
             });
 
             listItem.appendChild(a);
@@ -533,17 +591,7 @@ else {
     document.getElementById("clock").style.display = 'none';
 }
 
-if (settings.autoHide) {
-    document.body.classList.add('auto-hide');
-    document.addEventListener('mousemove', (e) => {
-        const threshold = 100;
-        if (window.innerHeight - e.clientY < threshold) {
-            document.body.classList.add('controls-visible');
-        } else {
-            document.body.classList.remove('controls-visible');
-        }
-    });
-}
+
 
 if (settings.weather) {
     const useCustomCity = settings.useCustomCity;
@@ -600,7 +648,7 @@ if (settings.quote !== false) {
     document.getElementById('quote').style.display = 'none';
 }
 
-if (settings.bookmarks) {
+function loadBookmarksTree() {
     if (typeof chrome !== 'undefined' && chrome.bookmarks) {
         chrome.bookmarks.getTree(tree => {
             const shortcuts = document.getElementById('shortcuts');
@@ -612,6 +660,9 @@ if (settings.bookmarks) {
                 shortcuts.textContent = "Bookmark folder not found.";
                 return;
             }
+
+            const tray = shortcuts.querySelector('.bookmarks-tray');
+            const wasCollapsed = tray ? tray.classList.contains('collapsed') : true;
 
             const listRoot = document.createElement('ul');
             listRoot.className = 'bookmark-list';
@@ -626,34 +677,49 @@ if (settings.bookmarks) {
             trigger.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
             trigger.title = "Bookmarks";
             
-            const tray = document.createElement('div');
-            tray.className = 'bookmarks-tray collapsed';
+            const newTray = document.createElement('div');
+            newTray.className = 'bookmarks-tray' + (wasCollapsed ? ' collapsed' : '');
             
             // Apply initial contrast styles based on body text color
             const isDarkBg = document.body.style.color === 'rgb(240, 240, 240)' || document.body.style.color === '#f0f0f0';
             if (isDarkBg) {
-                tray.style.background = 'rgba(25, 25, 25, 0.85)';
-                tray.style.color = '#f0f0f0';
+                newTray.style.background = 'rgba(25, 25, 25, 0.85)';
+                newTray.style.color = '#f0f0f0';
             } else {
-                tray.style.background = 'rgba(255, 255, 255, 0.95)';
-                tray.style.color = '#222';
+                newTray.style.background = 'rgba(255, 255, 255, 0.95)';
+                newTray.style.color = '#222';
             }
             
-            tray.appendChild(listRoot);
+            newTray.appendChild(listRoot);
             shortcuts.appendChild(trigger);
-            shortcuts.appendChild(tray);
+            shortcuts.appendChild(newTray);
             
             trigger.addEventListener('click', (e) => {
                 e.stopPropagation();
-                tray.classList.toggle('collapsed');
+                newTray.classList.toggle('collapsed');
             });
-            
-            // Close tray when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!tray.classList.contains('collapsed') && !tray.contains(e.target) && !trigger.contains(e.target)) {
-                    tray.classList.add('collapsed');
-                }
-            });
+        });
+    }
+}
+
+if (settings.bookmarks) {
+    if (typeof chrome !== 'undefined' && chrome.bookmarks) {
+        loadBookmarksTree();
+        
+        // Listen for changes
+        chrome.bookmarks.onCreated.addListener(loadBookmarksTree);
+        chrome.bookmarks.onRemoved.addListener(loadBookmarksTree);
+        chrome.bookmarks.onChanged.addListener(loadBookmarksTree);
+        chrome.bookmarks.onMoved.addListener(loadBookmarksTree);
+        
+        // Close tray when clicking outside
+        document.addEventListener('click', (e) => {
+            const shortcuts = document.getElementById('shortcuts');
+            const tray = shortcuts.querySelector('.bookmarks-tray');
+            const trigger = shortcuts.querySelector('.bookmarks-trigger');
+            if (tray && trigger && !tray.classList.contains('collapsed') && !tray.contains(e.target) && !trigger.contains(e.target)) {
+                tray.classList.add('collapsed');
+            }
         });
     } else {
         document.getElementById('shortcuts').textContent = "Bookmarks not available outside of extension.";
@@ -819,10 +885,8 @@ if (settings.sidebar) {
 
     // Hide/show bottom-left customize button based on sidebar position and state
     const customizeBtn = document.getElementById('customize');
-    const themeToggle = document.querySelector('.theme-toggle');
     const updateCustomizeVisibility = () => {
         const isLeft = settings.sidebarPosition === 'left';
-        const isRight = settings.sidebarPosition === 'right' || !settings.sidebarPosition;
         const isExpanded = !sidebar.classList.contains('minimised');
 
         // Hide customize button when sidebar is on left and expanded
@@ -832,15 +896,6 @@ if (settings.sidebar) {
         } else {
             customizeBtn.style.opacity = '1';
             customizeBtn.style.pointerEvents = 'auto';
-        }
-
-        // Hide theme toggle when sidebar is on right and expanded
-        if (isRight && isExpanded) {
-            themeToggle.style.opacity = '0';
-            themeToggle.style.pointerEvents = 'none';
-        } else {
-            themeToggle.style.opacity = '1';
-            themeToggle.style.pointerEvents = 'auto';
         }
     };
 
@@ -959,28 +1014,4 @@ const customizeIcon = {
     });
 
 // Initialize theme
-let theme = localStorage.getItem('theme') || 'system';
-applyTheme(theme);
-
-// Handle toggle click
-document.querySelector('.theme-toggle').addEventListener('click', () => {
-    if (theme === 'system') {
-        theme = 'adaptive';
-    } else if (theme === 'adaptive') {
-        theme = 'dark';
-    } else if (theme === 'dark') {
-        theme = 'light';
-    } else {
-        theme = 'system';
-    }
-
-    localStorage.setItem('theme', theme);
-    applyTheme(theme);
-});
-
-// React to system theme change if in system mode
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (theme === 'system') {
-        applyTheme('system');
-    }
-});
+applyTheme();
